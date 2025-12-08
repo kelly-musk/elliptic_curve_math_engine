@@ -18,9 +18,9 @@ pub const P: U256 = U256([
 ]);
 
 /// FieldElement which would be the basis of our curve points
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct FieldElement {
-    value: U256,
+    pub value: U256,
 }
 
 impl FieldElement {
@@ -78,7 +78,7 @@ impl FieldElement {
 /// 
 /// This converts to a u512 which even maxU256 ^ 2 can never overflow, then performs modulo of P in u512 form, 
 /// Then takes the least sig bits i.e. little endian and converts back to a U256([[u64;4]])
-pub(self) fn multiply(a: U256, b: U256) -> U256 {
+pub(crate) fn multiply(a: U256, b: U256) -> U256 {
     let result = a.full_mul(b);
     let reduced = result % U512::from(P);
     let lower_256 = U256([reduced.0[0], reduced.0[1], reduced.0[2], reduced.0[3]]);
