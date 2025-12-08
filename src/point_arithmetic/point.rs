@@ -80,10 +80,6 @@ impl EcPoint {
             }
         }
     }
-
-    // pub(crate) fn scalar_multiplication(self, scalar: FieldElement) -> Self {
-
-    // }
 }
 
 #[cfg(test)]

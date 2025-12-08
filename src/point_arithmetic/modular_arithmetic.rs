@@ -9,7 +9,9 @@ use std::ops::{Add, Div, Mul, Sub};
 ///
 /// U256: ([[u64;4]])
 ///
-/// y^2 = x^3 + 7
+/// y^2 = x^3 + 7 mod(P)
+/// 
+/// y^2 = x^3 + ax + b mod(P)
 pub const P: U256 = U256([
     0xFFFFFFFEFFFFFC2F,
     0xFFFFFFFFFFFFFFFF,
