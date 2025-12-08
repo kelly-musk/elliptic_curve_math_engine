@@ -62,6 +62,7 @@ impl EcPoint {
                         multiply(U256::from(3), multiply(x1.value, x1.value)) + A,
                     );
                     let denominator = FieldElement::new(multiply(U256::from(2), y1.value));
+                    //@note: This is where the division occurs, we try to avoid this here
                     let s = numerator / denominator;
                     let s_squared = FieldElement::new(multiply(s.value, s.value));
                     let x3 = s_squared - x1 - x2;
@@ -71,6 +72,7 @@ impl EcPoint {
                     // Case 2 (x1 != x2)
                     // Point Addition (P + Q where P!=Q)
                     // s = (y2-y1)/(x2-x1)
+                    //@note: This is where the division occurs, we try to avoid this here
                     let s = (y2 - y1) / (x2 - x1);
                     let s_squared = FieldElement::new(multiply(s.value, s.value));
                     let x3 = s_squared - x1 - x2;

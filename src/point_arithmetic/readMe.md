@@ -21,3 +21,10 @@
 - 96 Bytes (Three 32-byte integers)
 - Cheap (12 Multiplications, 0 Inversions)
 - Contains Explicit $Z=0$ for inifinity flag
+
+
+# Flow
+1. Collect value in [EcPoint](point.rs)
+2. Convert to [JacobianPoint](projective_point.rs)
+3. Perform operations
+4. Convert back to [EcPoint](point.rs)

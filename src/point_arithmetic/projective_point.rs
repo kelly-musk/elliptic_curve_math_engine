@@ -2,27 +2,30 @@
 //! 
 //! This would be used for calculation due to the avoidance of the inverse / division cost
 //! 
-//! EcPoint for logging and display , ProjectivePoint for calculation
+//! EcPoint for logging and display , JacobianPoint for calculation
+//! 
+//! Using Jacobian co-ordinates (X, Y, Z) to represent (X/Z^2, Y/Z^3) in EcPoint(x,y) coordinates
 
 use primitive_types::U256;
 
 use crate::point_arithmetic::{
-    modular_arithmetic::FieldElement, 
-    point::EcPoint
+    A, B, modular_arithmetic::FieldElement, multiply, point::EcPoint
 };
 
 /// Projective Point (X, Y, Z)
-/// Represents (X/Z, Y/Z) in Affine coordinates
+/// Represents (X/Z^2, Y/Z^3) in Affine coordinates
+/// 
+/// Y^2 = X^3 + aXZ^4 + bZ^6
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ProjectivePoint {
+pub struct JacobianPoint {
     pub x: FieldElement,
     pub y: FieldElement,
     pub z: FieldElement,
 }
 
-impl ProjectivePoint{
+impl JacobianPoint{
     /// To ensure that the point is at infinity, z should be zero
-    pub fn is_infinity(&self) -> bool {
+    pub(crate) fn is_infinity(&self) -> bool {
         if self.z.value == U256::zero() {
             return true;
         }
@@ -31,17 +34,80 @@ impl ProjectivePoint{
 
     /// When setting to infinity, z == 0 , x == 0 , y can be anything
     /// 
+    /// Y^2 = X^3 + aXZ^4 + bZ^6
+    /// 
     /// Y^2.Z = X^3.Z + 7.Z^3
-    pub fn infinity() -> Self {
+    pub(crate) fn infinity() -> Self {
         Self {
             x: FieldElement::new(U256::zero()),
             y: FieldElement::new(U256::from(1)),
             z: FieldElement::new(U256::zero()),
         }
     }
+
+    /// Addition for jacobianPoint
+    pub(crate) fn add(&self, other: &Self) -> Self{
+        if self.is_infinity() {
+            return *other;
+        }
+        if other.is_infinity() {
+            return *self;
+        }
+        // sub x = X/Z^2 && y = Y/Z^3
+        let z1_square = self.z * self.z;
+        let z2_square = other.z * other.z;
+        let u1 = self.x * z2_square;
+        let u2 = other.x * z1_square;
+        let s1 = self.y * z2_square * other.z;
+        let s2 = other.y * z1_square * self.z;
+        // h = u2 - u1 (change in x)
+        let h = u2 - u1;
+        // r = s2 - s1 (change in y)
+        let r = s2 - s1;
+        let x3 = (r * r) - (h * h * h) - (FieldElement::new(U256::from(2)) * u1 * h * h);
+        let y3 = r * (u1 * (h * h) - x3) - s1 * (h * h * h);
+        let z3 = h * self.z * other.z;
+        Self {
+            x: x3,
+            y: y3,
+            z: z3,
+        }
+    }
+
+    pub(crate) fn double(&self) -> Self {
+        // calculate intermediate values / squares
+        let a = self.x * self.x;
+        let b = self.y * self.y;
+        let c = b * self.y;
+        // calculate the slope
+        let s = FieldElement::new(U256::from(2)) * (((self.x + b) * (self.x + b)) - a - c);
+        // calculate the slope numerator
+        let m = FieldElement::new(U256::from(3)) * a ;
+        let x3 = (m * m) - (FieldElement::new(U256::from(2)) * s);
+        let y3 = m * (s - self.x) - (FieldElement::new(U256::from(8)) * c);
+        let z3 = FieldElement::new(U256::from(2)) * self.y * self.z;
+        // return the new point
+        Self {
+            x: x3,
+            y: y3,
+            z: z3,
+        }
+    }
+
+    pub(crate) fn scalar_mul(&self, scalar: U256) -> Self {
+        todo!()
+    }
+
+    pub(crate) fn scalar_div(&self, scalar: U256) -> Self {
+        todo!()
+    }
+
+    pub(crate) fn sub(&self, other: &Self) -> Self {
+        todo!()
+    }
 }
 
-impl From<EcPoint> for ProjectivePoint {
+impl From<EcPoint> for JacobianPoint {
     /// Convert from EcPoint to Projective
     /// Formula: (x, y) -> (x, y, 1)
     /// Infinity -> (0, 1, 0)
@@ -57,21 +123,25 @@ impl From<EcPoint> for ProjectivePoint {
     }
 }
 
-impl From<ProjectivePoint> for EcPoint {
+impl From<JacobianPoint> for EcPoint {
     /// Convert from Projective to Affine
-    /// Formula: (X, Y, Z) -> (X/Z, Y/Z)
+    /// Formula: (X, Y, Z) -> (X/Z^2, Y/Z^3)
     /// If Z == 0, return Infinity
-    fn from(pp: ProjectivePoint) -> Self {
+    fn from(jp: JacobianPoint) -> Self {
         // if the z is zero , simply return inifinity here
-        if pp.is_infinity() {
+        if jp.is_infinity() {
             return EcPoint::Infinity;
         }
-        // find inverse of z
-        let z_inv = pp.z.inverse();
-        // return the point (x/z, y/z)
+        // Find z^2 and z^3
+        let z_squared = multiply(jp.z.value, jp.z.value);
+        let z_cubed = multiply(z_squared, jp.z.value);
+        // find the inverse of both
+        let z_squared_inv = FieldElement::new(U256::from(z_squared));
+        let z_cubed_inv = FieldElement::new(U256::from(z_cubed));
+        // return the point (x/z^2, y/z^3)
         EcPoint::Point {
-            x: pp.x * z_inv,
-            y: pp.y * z_inv,
+            x: jp.x * z_squared_inv,
+            y: jp.y * z_cubed_inv,
         }
     }
 }
