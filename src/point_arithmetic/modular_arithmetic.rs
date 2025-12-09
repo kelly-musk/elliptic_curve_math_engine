@@ -4,13 +4,12 @@
 use primitive_types::{U256, U512};
 use std::ops::{Add, Div, Mul, Sub};
 
-
 /// Prime of the secp256k1 curve
 ///
 /// U256: ([[u64;4]])
 ///
 /// y^2 = x^3 + 7 mod(P)
-/// 
+///
 /// y^2 = x^3 + ax + b mod(P)
 pub const P: U256 = U256([
     0xFFFFFFFEFFFFFC2F,
@@ -39,7 +38,7 @@ impl FieldElement {
     ///
     /// If gcd(a,m) == 1, then ax + my = 1, so x is the modular inverse of a mod m / Prime field
     pub(crate) fn inverse(&self) -> Self {
-        // To ensure the value is not zero 
+        // To ensure the value is not zero
         if self.value == U256::zero() {
             panic!("Cannot inverse a zero value");
         }
@@ -58,11 +57,7 @@ impl FieldElement {
             // Update t: handle subtraction that might go negative
             // Instead of t - quotient * new_t, we compute it modulo P
             let prod = multiply(quotient, new_t);
-            let next_t = if t >= prod {
-                t - prod
-            } else {
-                P - (prod - t)
-            };
+            let next_t = if t >= prod { t - prod } else { P - (prod - t) };
             (t, new_t) = (new_t, next_t);
             (r, new_r) = (new_r, r - multiply(quotient, new_r));
         }
@@ -75,10 +70,9 @@ impl FieldElement {
     }
 }
 
-
 /// Helper function to handle multiplication for U256 values and avoid overflows
-/// 
-/// This converts to a u512 which even maxU256 ^ 2 can never overflow, then performs modulo of P in u512 form, 
+///
+/// This converts to a u512 which even maxU256 ^ 2 can never overflow, then performs modulo of P in u512 form,
 /// Then takes the least sig bits i.e. little endian and converts back to a U256([[u64;4]])
 pub(crate) fn multiply(a: U256, b: U256) -> U256 {
     let result = a.full_mul(b);
@@ -87,11 +81,14 @@ pub(crate) fn multiply(a: U256, b: U256) -> U256 {
     lower_256
 }
 
-// Set various arithmetic for the field points 
+// Set various arithmetic for the field points
 impl Add for FieldElement {
     type Output = Self;
     fn add(self, other: Self) -> Self {
-        FieldElement::new(self.value + other.value)
+        let add512: U512 = U512::from(self.value) + U512::from(other.value);
+        let reduced_val = add512 % U512::from(P);
+        let lower_256 = U256([reduced_val.0[0], reduced_val.0[1], reduced_val.0[2], reduced_val.0[3]]);
+        FieldElement::new(lower_256)
     }
 }
 
@@ -265,5 +262,319 @@ mod tests {
         let one = FieldElement::new(U256::one());
         let result = a * one;
         assert_eq!(result.value, U256::from(123));
+    }
+
+    // ========== Commutativity Tests ==========
+
+    #[test]
+    fn test_addition_commutativity_simple() {
+        // Test: a + b = b + a
+        let a = FieldElement::new(U256::from(123));
+        let b = FieldElement::new(U256::from(456));
+
+        let left = a + b;
+        let right = b + a;
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_addition_commutativity_large_values() {
+        // Test commutativity with large values near P
+        let a = FieldElement::new(P - U256::from(100));
+        let b = FieldElement::new(P - U256::from(200));
+
+        let left = a + b;
+        let right = b + a;
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_addition_commutativity_with_wrap() {
+        // Test commutativity when addition wraps around modulus
+        let a = FieldElement::new(P - U256::from(10));
+        let b = FieldElement::new(U256::from(50));
+
+        let left = a + b;
+        let right = b + a;
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_multiplication_commutativity_simple() {
+        // Test: a * b = b * a
+        let a = FieldElement::new(U256::from(17));
+        let b = FieldElement::new(U256::from(23));
+
+        let left = a * b;
+        let right = b * a;
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_multiplication_commutativity_large_values() {
+        // Test commutativity with large values
+        let a = FieldElement::new(U256::from(123456789));
+        let b = FieldElement::new(U256::from(987654321));
+
+        let left = a * b;
+        let right = b * a;
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_multiplication_commutativity_near_modulus() {
+        // Test commutativity with values near P
+        let a = FieldElement::new(P - U256::from(1));
+        let b = FieldElement::new(P - U256::from(2));
+
+        let left = a * b;
+        let right = b * a;
+
+        assert_eq!(left, right);
+    }
+
+    // ========== Associativity Tests ==========
+
+    #[test]
+    fn test_addition_associativity_simple() {
+        // Test: (a + b) + c = a + (b + c)
+        let a = FieldElement::new(U256::from(10));
+        let b = FieldElement::new(U256::from(20));
+        let c = FieldElement::new(U256::from(30));
+
+        let left = (a + b) + c;
+        let right = a + (b + c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_addition_associativity_large_values() {
+        // Test associativity with large values
+        let a = FieldElement::new(U256::from(1000000));
+        let b = FieldElement::new(U256::from(2000000));
+        let c = FieldElement::new(U256::from(3000000));
+
+        let left = (a + b) + c;
+        let right = a + (b + c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_addition_associativity_with_wrap() {
+        // Test associativity when operations wrap around modulus
+        let a = FieldElement::new(P - U256::from(100));
+        let b = FieldElement::new(P - U256::from(50));
+        let c = FieldElement::new(U256::from(200));
+
+        let left = (a + b) + c;
+        let right = a + (b + c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_multiplication_associativity_simple() {
+        // Test: (a * b) * c = a * (b * c)
+        let a = FieldElement::new(U256::from(5));
+        let b = FieldElement::new(U256::from(7));
+        let c = FieldElement::new(U256::from(11));
+
+        let left = (a * b) * c;
+        let right = a * (b * c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_multiplication_associativity_large_values() {
+        // Test associativity with larger values
+        let a = FieldElement::new(U256::from(12345));
+        let b = FieldElement::new(U256::from(67890));
+        let c = FieldElement::new(U256::from(11111));
+
+        let left = (a * b) * c;
+        let right = a * (b * c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_multiplication_associativity_near_modulus() {
+        // Test associativity with values that cause modular reduction
+        let a = FieldElement::new(P - U256::from(10));
+        let b = FieldElement::new(U256::from(100));
+        let c = FieldElement::new(U256::from(50));
+
+        let left = (a * b) * c;
+        let right = a * (b * c);
+
+        assert_eq!(left, right);
+    }
+
+    // ========== Distributivity Tests ==========
+
+    #[test]
+    fn test_distributivity_simple() {
+        // Test: a * (b + c) = a * b + a * c
+        let a = FieldElement::new(U256::from(5));
+        let b = FieldElement::new(U256::from(7));
+        let c = FieldElement::new(U256::from(11));
+
+        let left = a * (b + c);
+        let right = (a * b) + (a * c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_distributivity_large_values() {
+        // Test distributivity with larger values
+        let a = FieldElement::new(U256::from(12345));
+        let b = FieldElement::new(U256::from(67890));
+        let c = FieldElement::new(U256::from(11111));
+
+        let left = a * (b + c);
+        let right = (a * b) + (a * c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_distributivity_with_modular_wrap() {
+        // Test distributivity when operations wrap around modulus
+        let a = FieldElement::new(U256::from(1000));
+        let b = FieldElement::new(P - U256::from(100));
+        let c = FieldElement::new(U256::from(200));
+
+        let left = a * (b + c);
+        let right = (a * b) + (a * c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_distributivity_reverse() {
+        // Test: (a + b) * c = a * c + b * c
+        let a = FieldElement::new(U256::from(13));
+        let b = FieldElement::new(U256::from(17));
+        let c = FieldElement::new(U256::from(19));
+
+        let left = (a + b) * c;
+        let right = (a * c) + (b * c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_distributivity_with_subtraction() {
+        // Test: a * (b - c) = a * b - a * c
+        let a = FieldElement::new(U256::from(5));
+        let b = FieldElement::new(U256::from(20));
+        let c = FieldElement::new(U256::from(8));
+
+        let left = a * (b - c);
+        let right = (a * b) - (a * c);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_distributivity_subtraction_with_wrap() {
+        // Test distributivity with subtraction that wraps
+        let a = FieldElement::new(U256::from(100));
+        let b = FieldElement::new(U256::from(50));
+        let c = FieldElement::new(U256::from(80));
+
+        let left = a * (b - c);
+        let right = (a * b) - (a * c);
+
+        assert_eq!(left, right);
+    }
+
+    // ========== Combined Property Tests ==========
+
+    #[test]
+    fn test_combined_commutativity_associativity() {
+        // Test: (a + b) + c = (b + a) + c = c + (a + b)
+        let a = FieldElement::new(U256::from(100));
+        let b = FieldElement::new(U256::from(200));
+        let c = FieldElement::new(U256::from(300));
+
+        let result1 = (a + b) + c;
+        let result2 = (b + a) + c;
+        let result3 = c + (a + b);
+
+        assert_eq!(result1, result2);
+        assert_eq!(result2, result3);
+    }
+
+    #[test]
+    fn test_combined_distributivity_commutativity() {
+        // Test: a * (b + c) = a * (c + b) = (b + c) * a
+        let a = FieldElement::new(U256::from(7));
+        let b = FieldElement::new(U256::from(11));
+        let c = FieldElement::new(U256::from(13));
+
+        let result1 = a * (b + c);
+        let result2 = a * (c + b);
+        let result3 = (b + c) * a;
+
+        assert_eq!(result1, result2);
+        assert_eq!(result2, result3);
+    }
+
+    #[test]
+    fn test_complex_expression() {
+        // Test: (a + b) * (c + d) = a*c + a*d + b*c + b*d
+        let a = FieldElement::new(U256::from(5));
+        let b = FieldElement::new(U256::from(7));
+        let c = FieldElement::new(U256::from(11));
+        let d = FieldElement::new(U256::from(13));
+
+        let left = (a + b) * (c + d);
+        let right = (a * c) + (a * d) + (b * c) + (b * d);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_subtraction_commutativity_absence() {
+        // Verify that subtraction is NOT commutative (a - b ≠ b - a in general)
+        let a = FieldElement::new(U256::from(100));
+        let b = FieldElement::new(U256::from(50));
+
+        let left = a - b;
+        let right = b - a;
+
+        // These should be different
+        assert_ne!(left, right);
+
+        // But they should sum to zero (mod P)
+        let sum = left + right;
+        assert_eq!(sum.value, U256::zero());
+    }
+
+    #[test]
+    fn test_division_commutativity_absence() {
+        // Verify that division is NOT commutative (a / b ≠ b / a in general)
+        let a = FieldElement::new(U256::from(100));
+        let b = FieldElement::new(U256::from(50));
+
+        let left = a / b;
+        let right = b / a;
+
+        // These should be different
+        assert_ne!(left, right);
+
+        // But (a/b) * (b/a) should equal 1
+        let product = left * right;
+        assert_eq!(product.value, U256::one());
     }
 }
