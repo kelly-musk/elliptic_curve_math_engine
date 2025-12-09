@@ -59,7 +59,17 @@ impl FieldElement {
             let prod = multiply(quotient, new_t);
             let next_t = if t >= prod { t - prod } else { P - (prod - t) };
             (t, new_t) = (new_t, next_t);
-            (r, new_r) = (new_r, r - multiply(quotient, new_r));
+
+            // Update r: handle subtraction that might go negative
+            let prod_r = multiply(quotient, new_r);
+            let next_r = if r >= prod_r {
+                r - prod_r
+            } else {
+                // This should not happen in a correct Extended Euclidean Algorithm
+                // for finding modular inverse, but we handle it to prevent underflow
+                P - (prod_r - r)
+            };
+            (r, new_r) = (new_r, next_r);
         }
 
         if r > U256::one() {
@@ -87,7 +97,12 @@ impl Add for FieldElement {
     fn add(self, other: Self) -> Self {
         let add512: U512 = U512::from(self.value) + U512::from(other.value);
         let reduced_val = add512 % U512::from(P);
-        let lower_256 = U256([reduced_val.0[0], reduced_val.0[1], reduced_val.0[2], reduced_val.0[3]]);
+        let lower_256 = U256([
+            reduced_val.0[0],
+            reduced_val.0[1],
+            reduced_val.0[2],
+            reduced_val.0[3],
+        ]);
         FieldElement::new(lower_256)
     }
 }

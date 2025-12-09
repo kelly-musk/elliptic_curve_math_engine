@@ -48,10 +48,7 @@ impl JacobianPoint {
         if other.is_infinity() {
             return *self;
         }
-        if self == other {
-            return self.double();
-        }
-        // sub x = X/Z^2 && y = Y/Z^3
+
         let z1_square = self.z * self.z;
         let z2_square = other.z * other.z;
 
@@ -66,6 +63,24 @@ impl JacobianPoint {
         let s1 = self.y * z2_square * other.z;
         // s2 = Y2.Z1^3 (normalized y co-ordinates)
         let s2 = other.y * z1_square * self.z;
+
+        // Compute normalized coordinates to properly check if points are equal
+        // In Jacobian coords, (X,Y,Z) and (λ²X, λ³Y, λZ) represent the same EcPoint
+        // So we must compare the normalized values, not the raw coordinates
+
+        // Check if the points are equal by comparing normalized coordinates
+        // x1 == x2 (normalized)
+        if u1 == u2 {
+            // y1 == y2 (normalized)
+            if s1 == s2 {
+                // Same point - use point doubling
+                return self.double();
+            } else {
+                // Same x but different y - this is a vertical line
+                // The result is the point at infinity
+                return Self::infinity();
+            }
+        }
 
         // h = u2 - u1 (change in x)
         let h = u2 - u1;
@@ -86,18 +101,36 @@ impl JacobianPoint {
     }
 
     pub(crate) fn double(&self) -> Self {
-        // calculate intermediate values / squares
-        let a = self.x * self.x;
-        let b = self.y * self.y;
-        let c = b * self.y;
-        // calculate the slope
-        let s = FieldElement::new(U256::from(2)) * (((self.x + b) * (self.x + b)) - a - c);
-        // calculate the slope numerator
+        // Jacobian point doubling for a=0 (secp256k1: y² = x³ + 7)
+        // Formula:
+        //   S = 4*X*Y²
+        //   M = 3*X²
+        //   X' = M² - 2*S
+        //   Y' = M*(S - X') - 8*Y⁴
+        //   Z' = 2*Y*Z
+
+        let a = self.x * self.x; // X²
+        let b = self.y * self.y; // Y²
+        let c = b * b; // Y⁴ 
+
+        // S = 4*X*Y² = 2*(X + Y²)² - 2*X² - 2*Y⁴
+        // This is an optimized way to compute 4*X*Y²
+        // 2 * (self.x + b)^2 - 2 * a - 2 * c
+        let s = (FieldElement::new(U256::from(2)) * ((self.x + b) * (self.x + b)))
+            - (FieldElement::new(U256::from(2)) * (a + c));
+
+        // M = 3*X² (since a=0 for secp256k1)
         let m = FieldElement::new(U256::from(3)) * a;
+
+        // X' = M² - 2*S
         let x3 = (m * m) - (FieldElement::new(U256::from(2)) * s);
+
+        // Y' = M*(S - X') - 8*Y⁴
         let y3 = m * (s - x3) - (FieldElement::new(U256::from(8)) * c);
+
+        // Z' = 2*Y*Z
         let z3 = FieldElement::new(U256::from(2)) * self.y * self.z;
-        // return the new point
+
         Self {
             x: x3,
             y: y3,
@@ -147,6 +180,13 @@ impl From<JacobianPoint> for EcPoint {
         if jp.is_infinity() {
             return EcPoint::Infinity;
         }
+
+        // Optimization: if Z == 1, the point is already in affine form
+        // This avoids expensive modular inverse computation
+        if jp.z.value == U256::from(1) {
+            return EcPoint::Point { x: jp.x, y: jp.y };
+        }
+
         // Find z^2 and z^3
         let z_squared = jp.z * jp.z;
         let z_cubed = z_squared * jp.z;
@@ -328,8 +368,6 @@ mod jacobian_test {
         // Convert to affine to compare
         let affine_left = EcPoint::from(left);
         let affine_right = EcPoint::from(right);
-        // println!("generator: {:#?}", g);
-        // println!("2g {:#?}", two_g);
         assert_eq!(affine_left, affine_right);
     }
 
