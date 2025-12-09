@@ -53,19 +53,29 @@ impl JacobianPoint{
         if other.is_infinity() {
             return *self;
         }
+        if self == other {
+            return self.double();
+        }
         // sub x = X/Z^2 && y = Y/Z^3
         let z1_square = self.z * self.z;
         let z2_square = other.z * other.z;
+        // u1 = X1.Z2^2 
         let u1 = self.x * z2_square;
+        // u2 = X2.Z1^2
         let u2 = other.x * z1_square;
+        // s1 = Y1.Z2^3
         let s1 = self.y * z2_square * other.z;
+        // s2 = Y2.Z1^3
         let s2 = other.y * z1_square * self.z;
         // h = u2 - u1 (change in x)
         let h = u2 - u1;
         // r = s2 - s1 (change in y)
         let r = s2 - s1;
+        // x3 = r^2 - h^3 - 2.u1.h^2
         let x3 = (r * r) - (h * h * h) - (FieldElement::new(U256::from(2)) * u1 * h * h);
+        // y3 = r.(u1.h^2 - x3) - s1.h^3
         let y3 = r * (u1 * (h * h) - x3) - s1 * (h * h * h);
+        // z3 = h.z1.z2
         let z3 = h * self.z * other.z;
         Self {
             x: x3,
