@@ -7,8 +7,7 @@
 //! Using Jacobian co-ordinates (X, Y, Z) to represent (X/Z^2, Y/Z^3) in EcPoint(x,y) coordinates
 
 use primitive_types::U256;
-
-use crate::point_arithmetic::{modular_arithmetic::FieldElement, point::EcPoint};
+use crate::point_arithmetic::{modular_arithmetic::FieldElement, point::EcPoint, G_X_BYTES, G_Y_BYTES};
 
 /// Projective Point (X, Y, Z)
 /// Represents (X/Z^2, Y/Z^3) in Affine coordinates
@@ -221,33 +220,31 @@ impl From<JacobianPoint> for EcPoint {
     }
 }
 
+
+/// Helper function to get the secp256k1 generator point G in Jacobian coordinates
+pub fn get_generator_jacobian() -> JacobianPoint {
+    let gx = U256::from_big_endian(&G_X_BYTES);
+    let gy = U256::from_big_endian(&G_Y_BYTES);
+    JacobianPoint {
+        x: FieldElement::new(gx),
+        y: FieldElement::new(gy),
+        z: FieldElement::new(U256::from(1)),
+    }
+}
+
+/// Helper function to get the secp256k1 generator point G in affine coordinates
+pub fn get_generator_affine() -> EcPoint {
+    let gx = U256::from_big_endian(&G_X_BYTES);
+    let gy = U256::from_big_endian(&G_Y_BYTES);
+    EcPoint::Point {
+        x: FieldElement::new(gx),
+        y: FieldElement::new(gy),
+    }
+}
+
 #[cfg(test)]
 mod jacobian_test {
     use super::*;
-    use crate::point_arithmetic::point::{G_X_BYTES, G_Y_BYTES};
-
-    /// Helper function to get the secp256k1 generator point G in Jacobian coordinates
-    fn get_generator_jacobian() -> JacobianPoint {
-        let gx = U256::from_big_endian(&G_X_BYTES);
-        let gy = U256::from_big_endian(&G_Y_BYTES);
-
-        JacobianPoint {
-            x: FieldElement::new(gx),
-            y: FieldElement::new(gy),
-            z: FieldElement::new(U256::from(1)),
-        }
-    }
-
-    /// Helper function to get the secp256k1 generator point G in affine coordinates
-    fn get_generator_affine() -> EcPoint {
-        let gx = U256::from_big_endian(&G_X_BYTES);
-        let gy = U256::from_big_endian(&G_Y_BYTES);
-
-        EcPoint::Point {
-            x: FieldElement::new(gx),
-            y: FieldElement::new(gy),
-        }
-    }
 
     #[test]
     fn test_for_scalar_mult(){
