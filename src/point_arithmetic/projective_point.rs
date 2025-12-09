@@ -600,3 +600,4 @@ mod jacobian_test {
         assert_eq!(affine_1, affine_2);
     }
 }
+
