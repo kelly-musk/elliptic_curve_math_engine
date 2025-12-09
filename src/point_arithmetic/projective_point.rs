@@ -138,9 +138,29 @@ impl JacobianPoint {
         }
     }
 
-    // pub(crate) fn scalar_mul(&self, scalar: U256) -> Self {
-    //     todo!()
-    // }
+    /// Scalar multiplication for jacobianPoint
+    ///
+    /// Using double and add (binary expansion)
+    ///
+    /// scalar is the private key
+    pub(crate) fn scalar_mul(&self, scalar: U256) -> Self {
+        let mut result = Self::infinity();
+        let mut current_point = self.clone();
+        let mut k = scalar.clone();
+        // while k > 0
+        while k > U256::zero() {
+            // odd number check
+            if k.low_u64() & 1 == 1 {
+                // if odd
+                result = result.add(&current_point);
+            }
+            // always double the current point for the next bit position
+            current_point = current_point.double();
+            // shift the scalar by 1 bit to the right
+            k = k >> 1;
+        }
+        result
+    }
 
     // pub(crate) fn scalar_div(&self, scalar: U256) -> Self {
     //     todo!()
@@ -227,6 +247,15 @@ mod jacobian_test {
             x: FieldElement::new(gx),
             y: FieldElement::new(gy),
         }
+    }
+
+    #[test]
+    fn test_for_scalar_mult(){
+        let g = get_generator_jacobian();
+        let scalar = U256::from(1);
+        let pubkey = g.scalar_mul(scalar);
+        let pubkey_affine = EcPoint::from(pubkey);
+        assert_eq!(pubkey_affine, get_generator_affine());
     }
 
     // ========== Tests for is_infinity() ==========
@@ -600,4 +629,3 @@ mod jacobian_test {
         assert_eq!(affine_1, affine_2);
     }
 }
-
