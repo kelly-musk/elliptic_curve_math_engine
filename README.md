@@ -12,11 +12,27 @@ A Bitcoin secp256k1 keypair generation and management CLI tool built in Rust.
 
 ## Installation
 
-Build the project from source:
+### Build from Source
 
 ```bash
 cargo build --release
 ```
+
+The binary will be created at `./target/release/sec`
+
+### Install Globally (Optional)
+
+To use `sec` from anywhere on your system:
+
+```bash
+# Install to ~/.cargo/bin (make sure it's in your PATH)
+cargo install --path .
+
+# Or copy the binary to a directory in your PATH
+sudo cp ./target/release/sec /usr/local/bin/
+```
+
+After installation, you can use `sec` directly instead of `./target/release/sec`
 
 ## Usage
 
@@ -27,7 +43,7 @@ The CLI provides three main commands: `generate`, `derive`, and `info`.
 Generate a new random keypair with the default compressed public key format:
 
 ```bash
-cargo run -- generate
+sec generate
 ```
 
 **Example Output:**
@@ -39,24 +55,24 @@ Public Key (compressed): 02a1b2c3d4e5f6...
 
 - **Show private key** (⚠️ WARNING: Only for development/testing):
   ```bash
-  cargo run -- generate --show-private
+  sec generate --show-private
   ```
 
 - **Specify output format**:
   ```bash
   # Compressed format (33 bytes) - default
-  cargo run -- generate --format compressed
+  sec generate --format compressed
   
   # Uncompressed format (65 bytes)
-  cargo run -- generate --format uncompressed
+  sec generate --format uncompressed
   
   # X-only format (32 bytes) - for Taproot/BIP340
-  cargo run -- generate --format x-only
+  sec generate --format x-only
   ```
 
 - **Combined options**:
   ```bash
-  cargo run -- generate --format uncompressed --show-private
+  sec generate --format uncompressed --show-private
   ```
 
 ### 2. Derive Public Key from Private Key
@@ -64,12 +80,12 @@ Public Key (compressed): 02a1b2c3d4e5f6...
 Derive a public key from an existing private key (in hexadecimal format):
 
 ```bash
-cargo run -- derive --private-key <HEX_PRIVATE_KEY>
+sec derive --private-key <HEX_PRIVATE_KEY>
 ```
 
 **Example:**
 ```bash
-cargo run -- derive --private-key 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+sec derive --private-key 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
 ```
 
 **Example Output:**
@@ -81,9 +97,9 @@ Public Key (compressed): 02a1b2c3d4e5f6...
 
 - **Specify output format**:
   ```bash
-  cargo run -- derive --private-key <HEX> --format compressed
-  cargo run -- derive --private-key <HEX> --format uncompressed
-  cargo run -- derive --private-key <HEX> --format x-only
+  sec derive --private-key <HEX> --format compressed
+  sec derive --private-key <HEX> --format uncompressed
+  sec derive --private-key <HEX> --format x-only
   ```
 
 ### 3. Display Keypair Information
@@ -91,7 +107,7 @@ Public Key (compressed): 02a1b2c3d4e5f6...
 Display all public key formats for a given private key:
 
 ```bash
-cargo run -- info --private-key <HEX_PRIVATE_KEY>
+sec info --private-key <HEX_PRIVATE_KEY>
 ```
 
 **Example Output:**
@@ -132,21 +148,21 @@ Public Key Formats:
 
 ```bash
 # Generate keypair and save to file
-cargo run -- generate --show-private > my_keypair.txt
+sec generate --show-private > my_keypair.txt
 ```
 
 ### Derive Public Key in All Formats
 
 ```bash
 # Show all formats for a private key
-cargo run -- info --private-key abc123def456...
+sec info --private-key abc123def456...
 ```
 
 ### Quick Public Key Lookup
 
 ```bash
 # Get compressed public key from private key
-cargo run -- derive -p abc123def456... -f compressed
+sec derive -p abc123def456... -f compressed
 ```
 
 ## Security Notes
