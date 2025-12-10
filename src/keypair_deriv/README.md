@@ -14,3 +14,6 @@ This is not constant time. The if k.is_odd() branch creates a timing variance. A
 Production engines use the Montgomery Ladder approach, which performs an Addition and a Doubling at every step regardless of the bit value, ensuring the CPU takes the exact same time/power for every bit. 
 
 **Note:** For Project 5, the simple Double-and-Add is sufficient for functional correctness, but be aware of the side-channel leak.
+
+## Flow
+EcPoint -> Private Key (Scalar) -> Math Engine (Jacobian) -> Result (Affine 64-byte) -> Output (Compressed 33-byte).
