@@ -8,9 +8,17 @@ use super::{
 use primitive_types::U256;
 
 use crate::point_arithmetic::{
-    P, get_generator_affine,get_generator_jacobian
+    JacobianPoint, P, get_generator_affine, get_generator_jacobian
 };
-pub(crate) const CURVE_ORDER_HEX: &str = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F";
+
+/// How many points exist on the curve
+/// 
+/// CURVE_ORDER_HEX
+/// 
+/// 0 < k < N < P
+pub(crate) const N: &str = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
+
+#[derive(Debug)]
 pub struct KeyPair {
     /// scalar k
     pub private_key: PrivateKey,
@@ -20,6 +28,11 @@ pub struct KeyPair {
 
 impl KeyPair{
     pub fn generate() -> Self {
+        // set the n to the N
+        let n = U256::from_str_radix(N, 16).unwrap();
+        // We will be accepting Affine / Ecpoint co-ordinates
+        let g_affine = get_generator_affine();
+        let g_jacobian = JacobianPoint::from(g_affine);
         todo!()
     }
 }

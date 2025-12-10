@@ -1,4 +1,4 @@
-//! Projective Point (3d Ecpoint including flag(z) for infinity)
+//! Jacobian Point (3d Ecpoint including flag(z) for infinity)
 //!
 //! This would be used for calculation due to the avoidance of the inverse / division cost
 //!
@@ -6,8 +6,10 @@
 //!
 //! Using Jacobian co-ordinates (X, Y, Z) to represent (X/Z^2, Y/Z^3) in EcPoint(x,y) coordinates
 
+use crate::point_arithmetic::{
+    G_X_BYTES, G_Y_BYTES, modular_arithmetic::FieldElement, point::EcPoint,
+};
 use primitive_types::U256;
-use crate::point_arithmetic::{modular_arithmetic::FieldElement, point::EcPoint, G_X_BYTES, G_Y_BYTES};
 
 /// Projective Point (X, Y, Z)
 /// Represents (X/Z^2, Y/Z^3) in Affine coordinates
@@ -155,23 +157,11 @@ impl JacobianPoint {
             }
             // always double the current point for the next bit position
             current_point = current_point.double();
-            // shift the scalar by 1 bit to the right
+            // shift the scalar by 1 bit to the right / divide by 2
             k = k >> 1;
         }
         result
     }
-
-    // pub(crate) fn scalar_div(&self, scalar: U256) -> Self {
-    //     todo!()
-    // }
-
-    // pub(crate) fn sub(&self, other: &Self) -> Self {
-    //     todo!()
-    // }
-
-    // pub(crate) fn inverse(&self) -> Self {
-    //     todo!()
-    // }
 }
 
 impl From<EcPoint> for JacobianPoint {
@@ -220,7 +210,6 @@ impl From<JacobianPoint> for EcPoint {
     }
 }
 
-
 /// Helper function to get the secp256k1 generator point G in Jacobian coordinates
 pub fn get_generator_jacobian() -> JacobianPoint {
     let gx = U256::from_big_endian(&G_X_BYTES);
@@ -232,7 +221,7 @@ pub fn get_generator_jacobian() -> JacobianPoint {
     }
 }
 
-/// Helper function to get the secp256k1 generator point G in affine coordinates
+/// Helper function to get the secp256k1 generator point G in affine(EcPoint) coordinates
 pub fn get_generator_affine() -> EcPoint {
     let gx = U256::from_big_endian(&G_X_BYTES);
     let gy = U256::from_big_endian(&G_Y_BYTES);
@@ -247,12 +236,340 @@ mod jacobian_test {
     use super::*;
 
     #[test]
-    fn test_for_scalar_mult(){
+    fn test_for_scalar_mult() {
         let g = get_generator_jacobian();
         let scalar = U256::from(1);
         let pubkey = g.scalar_mul(scalar);
         let pubkey_affine = EcPoint::from(pubkey);
         assert_eq!(pubkey_affine, get_generator_affine());
+    }
+
+    // ========== Tests for scalar_mul() ==========
+
+    #[test]
+    fn test_scalar_mul_by_zero() {
+        // 0 * G = O (point at infinity)
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::zero());
+
+        assert!(result.is_infinity());
+    }
+
+    #[test]
+    fn test_scalar_mul_by_one() {
+        // 1 * G = G
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(1));
+        let result_affine = EcPoint::from(result);
+
+        assert_eq!(result_affine, get_generator_affine());
+    }
+
+    #[test]
+    fn test_scalar_mul_by_two() {
+        // 2 * G should equal G + G
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(2));
+        let expected = g.double();
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_by_three() {
+        // 3 * G should equal G + G + G
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(3));
+        let expected = g.add(&g.double());
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_by_four() {
+        // 4 * G should equal 2 * (2 * G)
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(4));
+        let expected = g.double().double();
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_by_five() {
+        // 5 * G = 4 * G + G
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(5));
+        let four_g = g.double().double();
+        let expected = four_g.add(&g);
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_by_seven() {
+        // 7 * G (binary: 111) - tests multiple consecutive 1 bits
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(7));
+
+        // Manually compute: 7G = 4G + 2G + G
+        let two_g = g.double();
+        let four_g = two_g.double();
+        let expected = four_g.add(&two_g).add(&g);
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_by_eight() {
+        // 8 * G = 2^3 * G (power of 2)
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(8));
+        let expected = g.double().double().double();
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_by_fifteen() {
+        // 15 * G (binary: 1111) - all 1 bits in lower nibble
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(15));
+
+        // 15 = 8 + 4 + 2 + 1
+        let two_g = g.double();
+        let four_g = two_g.double();
+        let eight_g = four_g.double();
+        let expected = eight_g.add(&four_g).add(&two_g).add(&g);
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_by_sixteen() {
+        // 16 * G = 2^4 * G
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(16));
+        let expected = g.double().double().double().double();
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_by_large_scalar() {
+        // Test with a larger scalar: 255 (binary: 11111111)
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(255));
+
+        // Verify it's not infinity
+        assert!(!result.is_infinity());
+
+        // Verify that 255*G + G = 256*G
+        let result_plus_g = result.add(&g);
+        let expected_256g = g.scalar_mul(U256::from(256));
+
+        let result_affine = EcPoint::from(result_plus_g);
+        let expected_affine = EcPoint::from(expected_256g);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_distributivity() {
+        // k * (P + Q) = k*P + k*Q is NOT generally true for scalars
+        // But we can test: k * P + m * P = (k + m) * P
+        let g = get_generator_jacobian();
+        let k = U256::from(7);
+        let m = U256::from(5);
+
+        let k_g = g.scalar_mul(k);
+        let m_g = g.scalar_mul(m);
+        let left = k_g.add(&m_g);
+
+        let k_plus_m = k + m; // 12
+        let right = g.scalar_mul(k_plus_m);
+
+        let left_affine = EcPoint::from(left);
+        let right_affine = EcPoint::from(right);
+
+        assert_eq!(left_affine, right_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_associativity() {
+        // (k * m) * G = k * (m * G)
+        let g = get_generator_jacobian();
+        let k = U256::from(3);
+        let m = U256::from(4);
+
+        // Left: (3 * 4) * G = 12 * G
+        let k_times_m = k * m;
+        let left = g.scalar_mul(k_times_m);
+
+        // Right: 3 * (4 * G)
+        let m_g = g.scalar_mul(m);
+        let right = m_g.scalar_mul(k);
+
+        let left_affine = EcPoint::from(left);
+        let right_affine = EcPoint::from(right);
+
+        assert_eq!(left_affine, right_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_with_infinity() {
+        // k * O = O for any k
+        let inf = JacobianPoint::infinity();
+        let result = inf.scalar_mul(U256::from(12345));
+
+        assert!(result.is_infinity());
+    }
+
+    #[test]
+    fn test_scalar_mul_power_of_two_pattern() {
+        // Test powers of 2: 2^n * G
+        let g = get_generator_jacobian();
+
+        // 2^0 = 1
+        let result_1 = g.scalar_mul(U256::from(1));
+        assert_eq!(EcPoint::from(result_1), get_generator_affine());
+
+        // 2^1 = 2
+        let result_2 = g.scalar_mul(U256::from(2));
+        let expected_2 = g.double();
+        assert_eq!(EcPoint::from(result_2), EcPoint::from(expected_2));
+
+        // 2^2 = 4
+        let result_4 = g.scalar_mul(U256::from(4));
+        let expected_4 = g.double().double();
+        assert_eq!(EcPoint::from(result_4), EcPoint::from(expected_4));
+
+        // 2^3 = 8
+        let result_8 = g.scalar_mul(U256::from(8));
+        let expected_8 = g.double().double().double();
+        assert_eq!(EcPoint::from(result_8), EcPoint::from(expected_8));
+    }
+
+    #[test]
+    fn test_scalar_mul_odd_even_scalars() {
+        let g = get_generator_jacobian();
+
+        // Test even scalar: 10 = 2 * 5
+        let result_10 = g.scalar_mul(U256::from(10));
+        let five_g = g.scalar_mul(U256::from(5));
+        let expected_10 = five_g.double();
+
+        assert_eq!(EcPoint::from(result_10), EcPoint::from(expected_10));
+
+        // Test odd scalar: 11 = 10 + 1
+        let result_11 = g.scalar_mul(U256::from(11));
+        let expected_11 = result_10.add(&g);
+
+        assert_eq!(EcPoint::from(result_11), EcPoint::from(expected_11));
+    }
+
+    #[test]
+    fn test_scalar_mul_binary_representation() {
+        // Test scalar with specific binary pattern: 21 = 0b10101
+        // This tests alternating bits
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(21));
+
+        // 21 = 16 + 4 + 1 = 2^4 + 2^2 + 2^0
+        let one_g = g.clone();
+        let four_g = g.double().double();
+        let sixteen_g = four_g.double().double();
+        let expected = sixteen_g.add(&four_g).add(&one_g);
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_consistency_with_addition() {
+        // Verify that k*G computed via scalar_mul matches repeated addition
+        let g = get_generator_jacobian();
+        let k = 6;
+
+        // Using scalar_mul
+        let result_scalar = g.scalar_mul(U256::from(k));
+
+        // Using repeated addition
+        let mut result_add = g.clone();
+        for _ in 1..k {
+            result_add = result_add.add(&g);
+        }
+
+        let scalar_affine = EcPoint::from(result_scalar);
+        let add_affine = EcPoint::from(result_add);
+
+        assert_eq!(scalar_affine, add_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_large_power_of_two() {
+        // Test 2^10 = 1024
+        let g = get_generator_jacobian();
+        let result = g.scalar_mul(U256::from(1024));
+
+        // Verify by doubling 10 times
+        let mut expected = g.clone();
+        for _ in 0..10 {
+            expected = expected.double();
+        }
+
+        let result_affine = EcPoint::from(result);
+        let expected_affine = EcPoint::from(expected);
+
+        assert_eq!(result_affine, expected_affine);
+    }
+
+    #[test]
+    fn test_scalar_mul_subtraction_property() {
+        // Test that k*G - m*G = (k-m)*G
+        // Since we don't have subtraction, we test: (k-m)*G + m*G = k*G
+        let g = get_generator_jacobian();
+        let k = U256::from(20);
+        let m = U256::from(8);
+
+        let k_g = g.scalar_mul(k);
+        let m_g = g.scalar_mul(m);
+        let k_minus_m = k - m; // 12
+        let k_minus_m_g = g.scalar_mul(k_minus_m);
+
+        // Verify: (k-m)*G + m*G = k*G
+        let left = k_minus_m_g.add(&m_g);
+
+        let left_affine = EcPoint::from(left);
+        let k_g_affine = EcPoint::from(k_g);
+
+        assert_eq!(left_affine, k_g_affine);
     }
 
     // ========== Tests for is_infinity() ==========

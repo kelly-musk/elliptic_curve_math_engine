@@ -4,5 +4,5 @@ pub use modular_arithmetic::*;
 pub mod point;
 pub use point::*;
 
-pub mod projective_point;
-pub use projective_point::*;
+pub mod jacobian_point;
+pub use jacobian_point::*;
