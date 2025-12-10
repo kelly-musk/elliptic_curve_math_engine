@@ -87,6 +87,21 @@ impl EcPoint {
         }
     }
 
+    /// Used for Bitcoin Taproot (BIP340)
+    ///
+    /// Serializes to the "X-only" format (32 bytes)
+    /// Format: X
+    pub fn serialize_x_only(&self) -> [u8;32] {
+        match self {
+            Self::Infinity => {
+                return [0u8;32];
+            }
+            Self::Point { x, y: _y } => {
+                return x.value.to_big_endian();
+            }
+        }
+    }
+
     pub(crate) fn add(self, other: Self) -> Self {
         match (self, other) {
             (EcPoint::Infinity, _) => other,
