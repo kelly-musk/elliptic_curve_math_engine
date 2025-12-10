@@ -1,37 +1,216 @@
-## Project 5: Elliptic Curve Math Engine
+# Elliptic Curve Math Engine
 
-### Implement 256-bit modular arithmetic for secp256k1:
-- Addition
-- Subtraction
-- Multiplication
-- Inversion
-Use Rust operator overloading and unit tests. Show applications in ECDSA, point multiplication, and public key derivation.
+A Bitcoin secp256k1 keypair generation and management CLI tool built in Rust.
 
+## Features
 
-The Verdict: Project 5 (Elliptic Curve Math Engine)In the world of Zero-Knowledge (ZK) and modern DLT security, math is the attack surface.While the other projects (Blockchain Clone, Explorer) teach you infrastructure (how data moves),
+- **256-bit modular arithmetic** for secp256k1 curve operations
+- **Keypair generation** with cryptographically secure random number generation
+- **Public key derivation** from private keys using scalar multiplication
+- **Multiple serialization formats**: compressed (33 bytes), uncompressed (65 bytes), and x-only (32 bytes for Taproot/BIP340)
+- **Jacobian coordinate system** for efficient elliptic curve operations
 
+## Installation
 
-Project 5 teaches you validity (why data is trusted). ZK proofs (SNARKs/STARKs) are essentially arithmetic circuits running over finite fields. If you do not intuitively understand modular arithmetic and elliptic curve group operations, you cannot audit ZK circuits effectively.
+Build the project from source:
 
-Why this builds the "Hacker Mindset" for ZK:ZK Bugs are Math Bugs: In standard software, you look for buffer overflows or reentrancy. In ZK circuits, you look for under-constrained polynomials and field overflows.The vulnerability: If your modular inverse function is slightly off, or if you don't handle the "point at infinity" edge case in your addition formula, a malicious prover can forge a proof.
+```bash
+cargo build --release
+```
 
-The Project 5 lesson: By implementing secp256k1 from scratch, you will personally encounter the edge cases (like $P + (-P) = O$) that destroy production systems when ignored.
+## Usage
 
-The "Black Box" Problem: Most developers just import arkworks or bellman and trust the crypto. As a security researcher, you cannot afford to trust.
+The CLI provides three main commands: `generate`, `derive`, and `info`.
 
-Building the engine in Rust forces you to grapple with BigInt memory management and the cost of scalar multiplication—skills directly transferable to optimizing and auditing ZK verifier gas costs on-chain.
+### 1. Generate a New Keypair
 
-Foundation for Advanced Attacks:Small Subgroup Attacks: You'll learn why we check if a point lies on the curve.Malleability: You'll see how valid signatures can be altered without the private key if the math allows it (a classic Bitcoin transaction malleability issue).
+Generate a new random keypair with the default compressed public key format:
 
-How to "Hack" Your Own Learning (The Security Twist)Don't just build the engine; build it to fail and then patch it. Here is how you modify Project 5 to be a security research tool:
+```bash
+cargo run -- generate
+```
 
-1. Implement "Unsafe" Math FirstStart by implementing addition and multiplication without modular reduction in intermediate steps, then exploit it by passing in a number larger than the field modulus $p$.Goal: Create a "fake" public key that validates because of an overflow error.
-2. The "Constant Time" ChallengeRust's standard math operators might be optimized by the compiler in ways that leak execution time (side-channel attacks).Challenge: Can you implement modular exponentiation so that it takes the exact same amount of time regardless of whether the bit is a 0 or a 1? (Look up "Montgomery Ladder").
-3. Bridge to ZK (The "Hybrid" aspect)Once your engine works, do not just sign messages. Try to prove knowledge of a discrete log.Task: Implement a simple Schnorr Signature. This is a "Zero-Knowledge Proof" that you know the private key $x$ for public key $P$, without revealing $x$. This is the "Hello World" of ZK.
+**Example Output:**
+```
+Public Key (compressed): 02a1b2c3d4e5f6...
+```
 
-Recommended Tooling (Rust)Since you are using Rust, you will be fighting the borrow checker. Use this to your advantage:
+#### Options:
 
-Crates: Avoid num-bigint initially if you are brave; try implementing fixed-size 256-bit integers using arrays $[u64; 4]$ for the raw experience of managing carries and overflows.Testing: Use proptest in Rust to fuzz your math engine. Generate random large integers and assert that $(a + b) \pmod p == (a \pmod p + b \pmod p) \pmod p$.
+- **Show private key** (⚠️ WARNING: Only for development/testing):
+  ```bash
+  cargo run -- generate --show-private
+  ```
 
-class lamba implementations
-lambdaworks
+- **Specify output format**:
+  ```bash
+  # Compressed format (33 bytes) - default
+  cargo run -- generate --format compressed
+  
+  # Uncompressed format (65 bytes)
+  cargo run -- generate --format uncompressed
+  
+  # X-only format (32 bytes) - for Taproot/BIP340
+  cargo run -- generate --format x-only
+  ```
+
+- **Combined options**:
+  ```bash
+  cargo run -- generate --format uncompressed --show-private
+  ```
+
+### 2. Derive Public Key from Private Key
+
+Derive a public key from an existing private key (in hexadecimal format):
+
+```bash
+cargo run -- derive --private-key <HEX_PRIVATE_KEY>
+```
+
+**Example:**
+```bash
+cargo run -- derive --private-key 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+```
+
+**Example Output:**
+```
+Public Key (compressed): 02a1b2c3d4e5f6...
+```
+
+#### Options:
+
+- **Specify output format**:
+  ```bash
+  cargo run -- derive --private-key <HEX> --format compressed
+  cargo run -- derive --private-key <HEX> --format uncompressed
+  cargo run -- derive --private-key <HEX> --format x-only
+  ```
+
+### 3. Display Keypair Information
+
+Display all public key formats for a given private key:
+
+```bash
+cargo run -- info --private-key <HEX_PRIVATE_KEY>
+```
+
+**Example Output:**
+```
+=== Keypair Information ===
+Private Key: 1234567890abcdef...
+
+Public Key Formats:
+  Compressed (33 bytes):   02a1b2c3d4e5f6...
+  Uncompressed (65 bytes): 04a1b2c3d4e5f6...
+  X-Only (32 bytes):       a1b2c3d4e5f6...
+```
+
+## Command Reference
+
+### Global Options
+
+- `--help` - Display help information
+- `--version` - Display version information
+
+### Commands
+
+| Command | Description | Required Args | Optional Args |
+|---------|-------------|---------------|---------------|
+| `generate` | Generate a new keypair | None | `--format`, `--show-private` |
+| `derive` | Derive public key from private key | `--private-key` | `--format` |
+| `info` | Display all keypair information | `--private-key` | None |
+
+### Format Options
+
+- `compressed` - 33-byte compressed format (prefix: 0x02 or 0x03)
+- `uncompressed` - 65-byte uncompressed format (prefix: 0x04)
+- `x-only` - 32-byte x-coordinate only (for Taproot/BIP340)
+
+## Examples
+
+### Generate and Save a Keypair
+
+```bash
+# Generate keypair and save to file
+cargo run -- generate --show-private > my_keypair.txt
+```
+
+### Derive Public Key in All Formats
+
+```bash
+# Show all formats for a private key
+cargo run -- info --private-key abc123def456...
+```
+
+### Quick Public Key Lookup
+
+```bash
+# Get compressed public key from private key
+cargo run -- derive -p abc123def456... -f compressed
+```
+
+## Security Notes
+
+⚠️ **IMPORTANT SECURITY WARNINGS:**
+
+1. **Never share your private key** - Anyone with your private key has full control of your funds
+2. **The `--show-private` flag is for development only** - Never use in production
+3. **Private keys are 256-bit random numbers** - Must be within range `0 < k < n` where `n` is the curve order
+4. **Store private keys securely** - Use hardware wallets or encrypted storage in production
+
+## Technical Details
+
+### Elliptic Curve Operations
+
+- **Curve**: secp256k1 (y² = x³ + 7)
+- **Field Prime (P)**: 2²⁵⁶ - 2³² - 977
+- **Curve Order (N)**: FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+- **Generator Point (G)**: Standard secp256k1 generator
+
+### Implementation
+
+- **Coordinate System**: Jacobian coordinates for efficient computation
+- **Scalar Multiplication**: Double-and-add algorithm
+- **Random Generation**: OS-provided cryptographically secure RNG
+- **Modular Arithmetic**: Custom 256-bit field element implementation
+
+## Running Tests
+
+Run the comprehensive test suite:
+
+```bash
+# Run all tests
+cargo test
+
+# Run specific test module
+cargo test jacobian_test
+cargo test ec_point::tests
+
+# Run with output
+cargo test -- --nocapture
+```
+
+## Development
+
+### Project Structure
+
+```
+src/
+├── cli/
+│   ├── handler.rs      # CLI command handlers
+│   └── mod.rs
+├── keypair_deriv/
+│   ├── keypair.rs      # Keypair generation
+│   ├── private_key.rs  # Private key wrapper
+│   └── pubkey.rs       # Public key wrapper
+├── point_arithmetic/
+│   ├── ec_point.rs     # Affine coordinates & serialization
+│   ├── field_element.rs # Modular arithmetic
+│   └── jacobian_point.rs # Jacobian coordinates & operations
+├── lib.rs
+└── main.rs             # CLI entry point
+```
+
+## License
+
+This project is for educational purposes.

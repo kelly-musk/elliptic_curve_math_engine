@@ -33,3 +33,5 @@
 2. Convert to [JacobianPoint](projective_point.rs)
 3. Perform operations
 4. Convert back to [EcPoint](point.rs)
+
+Private Key (Scalar) -> Math Engine (Jacobian) -> Result (Affine 64-byte) -> Output (Compressed 33-byte).

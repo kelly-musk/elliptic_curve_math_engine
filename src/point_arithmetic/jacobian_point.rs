@@ -7,7 +7,7 @@
 //! Using Jacobian co-ordinates (X, Y, Z) to represent (X/Z^2, Y/Z^3) in EcPoint(x,y) coordinates
 
 use crate::point_arithmetic::{
-    G_X_BYTES, G_Y_BYTES, modular_arithmetic::FieldElement, point::EcPoint,
+    G_X_BYTES, G_Y_BYTES, field_element::FieldElement, ec_point::EcPoint,
 };
 use primitive_types::U256;
 
