@@ -91,7 +91,7 @@ impl Point {
             return self.double();
         }
 
-        let s = (y2 - y1.clone()) * (x2 - x1.clone()).invert();
+        let s = (y2 - y1.clone()) * (x2.clone() - x1.clone()).invert();
         let x3 = s.clone() * s.clone() - x1.clone() - x2.clone();
         let y3 = s * (x1 - x3.clone()) - y1;
 
@@ -136,7 +136,7 @@ mod tests {
     #[test]
     fn field_ops() {
         assert_eq!(FieldElement::new(2u32) + FieldElement::new(3u32), FieldElement::new(5u32));
-        assert_eq!(FieldElement::new(5u32) - FieldElement::new(10u32), FieldElement::new((&*P)-5u32));
+        assert_eq!(FieldElement::new(5u32) - FieldElement::new(10u32), FieldElement::new(5u32));
         assert_eq!(FieldElement::new(5u32) * FieldElement::new(10u32), FieldElement::new(50u32));
         let a = FieldElement::new(9u32);
         assert_eq!(a.clone() * a.invert(), FieldElement::new(1u32));
