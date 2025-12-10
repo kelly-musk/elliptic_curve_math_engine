@@ -3,6 +3,10 @@ name = "elliptic_curve_math_engine"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "sec"
+path = "src/main.rs"
+
 [dependencies]
 # For point arithmetic
 hex-literal = "1.1.0"
